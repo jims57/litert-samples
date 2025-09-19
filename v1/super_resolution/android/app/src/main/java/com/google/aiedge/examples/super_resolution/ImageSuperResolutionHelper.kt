@@ -80,7 +80,7 @@ class ImageSuperResolutionHelper(private val context: Context) {
             val imageProcessor =
                 ImageProcessor
                     .Builder()
-                    .add(ResizeOp(h, w, ResizeOp.ResizeMethod.BILINEAR))
+                    .add(ResizeOp(h, w, ResizeOp.ResizeMethod.NEAREST_NEIGHBOR))
                     .add(NormalizeOp(0f, 1f))
                     .build()
 

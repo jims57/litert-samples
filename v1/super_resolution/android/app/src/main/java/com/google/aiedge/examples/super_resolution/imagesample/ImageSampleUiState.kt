@@ -22,7 +22,7 @@ import androidx.compose.runtime.Immutable
 @Immutable
 data class ImageSampleUiState(
     val sampleUriList: List<String> = listOf(
-        "lr-1.jpg", "lr-2.jpg", "lr-3.jpg"
+        "lr-1.jpg", "lr-2.jpg", "lr-3.jpg", "cat_50x50.jpg", "chip_50x50.jpg", "frog_50x50.jpg"
     ),
     val selectBitmap: Bitmap? = null,
     val sharpenBitmap: Bitmap? = null,
