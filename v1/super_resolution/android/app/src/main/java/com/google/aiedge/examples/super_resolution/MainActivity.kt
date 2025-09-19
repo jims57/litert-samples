@@ -16,9 +16,17 @@
 
 package com.google.aiedge.examples.super_resolution
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Build.VERSION_CODES
 import android.os.Bundle
+import android.os.Environment
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -50,18 +58,54 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.google.aiedge.examples.super_resolution.gallery.ImagePickerScreen
 import com.google.aiedge.examples.super_resolution.imagesample.ImageSampleScreen
 import com.google.aiedge.examples.super_resolution.ui.ApplicationTheme
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        private const val TAG = "MainActivity"
+        private val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= 33) {
+            arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            )
+        }
+    }
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (!allGranted) {
+            Toast.makeText(
+                this,
+                "Storage permissions are required to save result images",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     @OptIn(ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Request storage permissions
+        requestStoragePermissions()
+        
         setContent {
             var tabState by remember { mutableStateOf(MenuTab.ImageSample) }
             var inferenceTimeState by remember {
@@ -70,6 +114,7 @@ class MainActivity : ComponentActivity() {
             var delegateState by remember {
                 mutableStateOf(ImageSuperResolutionHelper.Delegate.CPU)
             }
+            val context = LocalContext.current
 
             ApplicationTheme {
                 BottomSheetScaffold(
@@ -85,12 +130,56 @@ class MainActivity : ComponentActivity() {
                         Header()
                         Content(tab = tabState, delegate = delegateState, onTabChanged = {
                             tabState = it
-                        }, onInferenceTimeCallback = {
-                            inferenceTimeState = it.toString()
+                        }, onInferenceTimeCallback = { result, inferenceTime ->
+                            inferenceTimeState = inferenceTime.toString()
+                            // Save the result image to public Documents folder
+                            result?.let { bitmap ->
+                                saveResultImageToDocuments(bitmap, context)
+                            }
                         })
                     }
                 }
             }
+        }
+    }
+
+    private fun requestStoragePermissions() {
+        val notGrantedPermissions = REQUIRED_PERMISSIONS.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (notGrantedPermissions.isNotEmpty()) {
+            requestPermissionLauncher.launch(notGrantedPermissions.toTypedArray())
+        }
+    }
+
+    private fun saveResultImageToDocuments(bitmap: android.graphics.Bitmap, context: android.content.Context) {
+        try {
+            // Get public Documents directory
+            val documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            
+            // Create directory if it doesn't exist
+            if (!documentsDir.exists()) {
+                documentsDir.mkdirs()
+            }
+            
+            // Create file with timestamp
+            val timestamp = System.currentTimeMillis()
+            val fileName = "super_resolution_result_${timestamp}.png"
+            val outputFile = File(documentsDir, fileName)
+            
+            // Save bitmap to file
+            FileOutputStream(outputFile).use { fos ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, fos)
+                fos.flush()
+            }
+            
+            Log.i(TAG, "Result image saved to: ${outputFile.absolutePath}")
+            Toast.makeText(context, "Result saved to Documents: $fileName", Toast.LENGTH_LONG).show()
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save result image", e)
+            Toast.makeText(context, "Failed to save result image", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -100,7 +189,7 @@ class MainActivity : ComponentActivity() {
         delegate: ImageSuperResolutionHelper.Delegate,
         modifier: Modifier = Modifier,
         onTabChanged: (MenuTab) -> Unit,
-        onInferenceTimeCallback: (Int) -> Unit,
+        onInferenceTimeCallback: (android.graphics.Bitmap?, Long) -> Unit,
     ) {
         val tabs = MenuTab.entries
         Column(modifier) {
@@ -116,11 +205,15 @@ class MainActivity : ComponentActivity() {
 
             when (tab) {
                 MenuTab.ImageSample -> ImageSampleScreen(
-                    delegate = delegate, onInferenceTimeCallback = onInferenceTimeCallback
+                    delegate = delegate, onInferenceTimeCallback = { bitmap, time ->
+                        onInferenceTimeCallback(bitmap, time)
+                    }
                 )
 
                 MenuTab.Gallery -> ImagePickerScreen(
-                    delegate = delegate, onInferenceTimeCallback = onInferenceTimeCallback
+                    delegate = delegate, onInferenceTimeCallback = { bitmap, time ->
+                        onInferenceTimeCallback(bitmap, time)
+                    }
                 )
             }
         }

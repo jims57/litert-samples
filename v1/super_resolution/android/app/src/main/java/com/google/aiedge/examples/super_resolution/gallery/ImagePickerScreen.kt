@@ -68,7 +68,7 @@ import kotlin.math.roundToInt
 fun ImagePickerScreen(
     modifier: Modifier = Modifier,
     delegate: ImageSuperResolutionHelper.Delegate,
-    onInferenceTimeCallback: (Int) -> Unit,
+    onInferenceTimeCallback: (android.graphics.Bitmap?, Long) -> Unit,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -79,7 +79,7 @@ fun ImagePickerScreen(
     val scrollState = rememberScrollState()
 
     LaunchedEffect(key1 = uiState.inferenceTime) {
-        onInferenceTimeCallback(uiState.inferenceTime)
+        onInferenceTimeCallback(uiState.sharpenBitmap, uiState.inferenceTime.toLong())
     }
 
     LaunchedEffect(key1 = delegate) {

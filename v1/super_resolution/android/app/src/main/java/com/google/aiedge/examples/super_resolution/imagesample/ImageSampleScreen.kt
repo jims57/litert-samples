@@ -45,7 +45,7 @@ import java.io.InputStream
 fun ImageSampleScreen(
     modifier: Modifier = Modifier,
     delegate: ImageSuperResolutionHelper.Delegate,
-    onInferenceTimeCallback: (Int) -> Unit,
+    onInferenceTimeCallback: (android.graphics.Bitmap?, Long) -> Unit,
 ) {
     val context = LocalContext.current
     val viewModel: ImageSampleViewModel =
@@ -56,7 +56,7 @@ fun ImageSampleScreen(
     val sharpenBitmap = uiState.sharpenBitmap
 
     LaunchedEffect(key1 = uiState.inferenceTime) {
-        onInferenceTimeCallback(uiState.inferenceTime)
+        onInferenceTimeCallback(uiState.sharpenBitmap, uiState.inferenceTime.toLong())
     }
 
     LaunchedEffect(key1 = delegate) {
